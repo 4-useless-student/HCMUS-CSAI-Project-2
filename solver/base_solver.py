@@ -213,7 +213,13 @@ class BaseSolver:
         print(f"Finished in {self.execution_time:.4f}s")
         if self.output_file:
             self.save_output(self.output_file)
+        return self.execution_time
 
     def save_output(self, output_file):
-        # Implementation for saving output format
-        pass
+        """Lưu kết quả ra file theo định dạng ma trận."""
+        if self.solution is None:
+            return
+        output_lines = self.format_solution()
+        with open(output_file, 'w') as f:
+            for line in output_lines:
+                f.write(line + '\n')
