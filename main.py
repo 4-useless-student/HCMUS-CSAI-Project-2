@@ -1,6 +1,6 @@
 import os
 import time
-from algs_helper import AStarSolver, CNFSolver, BacktrackingSolver 
+from algs_helper import AStarSolver, CNFSolver, BacktrackingSolver, BruteForceSolver
 
 
 
@@ -32,9 +32,10 @@ def main():
         
         # --- Thêm thuật toán muốn chạy vào đây ---
         solver_classes = [
-            AStarSolver,
+            # AStarSolver,
             # CNFSolver, 
-            # BacktrackingSolver
+            # BacktrackingSolver,
+            BruteForceSolver
         ]
         
         for SolverClass in solver_classes:
@@ -47,6 +48,11 @@ def main():
                 # Chạy thuật toán và đo giờ
                 exec_time = solver.run()
                 
+                # Kiểm tra xem có solution không
+                if solver.solution is None:
+                    print(f"{filename:<15} | {algo_name:<15} | {exec_time:<10.4f} | No Solution")
+                    continue
+                
                 # Tạo tên file output: input-01.txt -> output-01_AStarSolver.txt
                 output_filename = filename.replace('input', 'output').replace('.txt', f'_{algo_name}.txt')
                 output_path = os.path.join(output_folder, output_filename)
@@ -54,7 +60,7 @@ def main():
                 # Lưu kết quả
                 solver.save_output(output_path)
                 
-                print(f"{filename:<15} | {algo_name:<15} | {exec_time:.4f}     | Done")
+                print(f"{filename:<15} | {algo_name:<15} | {exec_time:<10.4f} | Done")
 
             except Exception as e:
                 print(f"{filename:<15} | {algo_name:<15} | ERROR      | {str(e)}")
