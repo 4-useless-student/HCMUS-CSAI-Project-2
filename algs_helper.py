@@ -535,14 +535,6 @@ class CNFSolver(BaseSolver):
     def solve():
         pass
 class BacktrackingSolver(BaseSolver):
-    """
-    Thuật toán Backtracking (DPLL - Davis-Putnam-Logemann-Loveland) để giải CNF.
-    Các kỹ thuật chính:
-    1. Unit Propagation: Tự động gán giá trị cho biến trong mệnh đề đơn vị
-    2. Pure Literal Elimination: Loại bỏ literal chỉ xuất hiện dưới 1 dạng
-    3. Decision: Chọn biến chưa gán và thử True/False
-    4. Backtracking: Quay lui nếu gặp mâu thuẫn
-    """
     def __init__(self, input_file):
         super().__init__(input_file)
     
@@ -550,7 +542,7 @@ class BacktrackingSolver(BaseSolver):
         """Thực thi thuật toán DPLL Backtracking"""
         # Sinh CNF
         self.generate_cnf()
-        
+
         if not self.cnf_clauses:
             return
         
@@ -620,10 +612,6 @@ class BacktrackingSolver(BaseSolver):
         return self._dpll(new_clauses, new_assignment)
     
     def _unit_propagation(self, clauses, assignment):
-        """
-        Unit Propagation: Tìm mệnh đề đơn vị và gán giá trị bắt buộc.
-        Mệnh đề đơn vị là mệnh đề chỉ còn 1 literal chưa gán.
-        """
         changed = True
         while changed:
             changed = False
@@ -648,9 +636,6 @@ class BacktrackingSolver(BaseSolver):
         return clauses, assignment
     
     def _pure_literal_elimination(self, clauses, assignment):
-        """
-        Pure Literal Elimination: Tìm literal chỉ xuất hiện dưới 1 dạng (toàn dương hoặc toàn âm).
-        """
         # Đếm số lần xuất hiện dạng dương và âm của mỗi biến
         pos_count = {}
         neg_count = {}
@@ -684,11 +669,6 @@ class BacktrackingSolver(BaseSolver):
         return clauses, assignment
     
     def _simplify(self, clauses, var, value):
-        """
-        Đơn giản hóa công thức CNF sau khi gán var = value.
-        - Loại bỏ mệnh đề được thỏa mãn
-        - Loại bỏ literal sai trong các mệnh đề còn lại
-        """
         new_clauses = []
         for clause in clauses:
             # Kiểm tra xem mệnh đề có được thỏa mãn không
@@ -711,14 +691,12 @@ class BacktrackingSolver(BaseSolver):
         return new_clauses
     
     def _choose_variable(self, clauses, assignment):
-        """Chọn biến chưa gán để quyết định (theo thứ tự xuất hiện nhiều nhất)"""
         for var in self.ordered_vars:
             if var not in assignment:
                 return var
         return None
     
     def _reconstruct_solution_from_cnf(self, assignment):
-        """Chuyển CNF assignment thành bridge solution"""
         self.solution = []
         
         for i, bridge in enumerate(self.potential_bridges):
@@ -744,7 +722,6 @@ class BacktrackingSolver(BaseSolver):
                 })
     
     def format_solution(self):
-        """Vẽ ma trận kết quả"""
         if not self.solution:
             return []
         
@@ -769,19 +746,10 @@ class BacktrackingSolver(BaseSolver):
 
 
 class BruteForceSolver(BaseSolver):
-    """
-    Thuật toán Brute Force để giải CNF.
-    Các bước thực hiện:
-    1. Thu thập tất cả biến xuất hiện trong CNF
-    2. Sinh tất cả phép gán (True/False) với itertools.product
-    3. Áp dụng Unit Propagation và Pure Literal Elimination để tối ưu
-    4. Kiểm tra tính thỏa mãn của CNF với mỗi phép gán
-    """
     def __init__(self, input_file):
         super().__init__(input_file)
     
     def solve(self):
-        """Thực thi thuật toán Brute Force"""
         # Sinh CNF
         self.generate_cnf()
         
@@ -815,7 +783,6 @@ class BruteForceSolver(BaseSolver):
                 return
     
     def _apply_propagation(self, clauses, assignment):
-        """Áp dụng Unit Propagation để phát hiện mâu thuẫn sớm"""
         changed = True
         while changed:
             changed = False
@@ -864,10 +831,6 @@ class BruteForceSolver(BaseSolver):
         return assignment, True
     
     def _check_cnf_satisfaction(self, assignment):
-        """
-        Kiểm tra tính thỏa mãn của CNF với phép gán hiện tại.
-        Mỗi mệnh đề phải có ít nhất 1 literal được thỏa mãn.
-        """
         for clause in self.cnf_clauses:
             clause_satisfied = False
             
@@ -886,7 +849,6 @@ class BruteForceSolver(BaseSolver):
         return True
     
     def _reconstruct_solution_from_cnf(self, assignment):
-        """Chuyển CNF assignment thành bridge solution"""
         self.solution = []
         
         for i, bridge in enumerate(self.potential_bridges):
@@ -912,7 +874,6 @@ class BruteForceSolver(BaseSolver):
                 })
     
     def format_solution(self):
-        """Vẽ ma trận kết quả"""
         if not self.solution:
             return []
         
