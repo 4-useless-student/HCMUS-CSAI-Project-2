@@ -1,4 +1,7 @@
 import heapq
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
 
 class AStarNode:
     """Node class for A* search with better comparison"""
@@ -173,3 +176,77 @@ def compute_variable_scores(cnf_clauses):
             var_id = abs(lit)
             scores[var_id] = scores.get(var_id, 0) + 1
     return scores
+
+
+def plot_benchmark(df, image_dir, TIMEOUT_LIMIT):
+    """
+    Vẽ 2 biểu đồ tổng hợp (Line Chart):
+    1. benchmark_chart_time.png: So sánh thời gian chạy.
+    2. benchmark_chart_memory.png: So sánh bộ nhớ tiêu thụ.
+    """
+    # Định nghĩa cấu hình cho 2 biểu đồ
+    metrics = [
+        {
+            "col": "Time",
+            "ylabel": "Time (seconds)",
+            "title": "Performance Comparison: Execution Time",
+            "filename": "benchmark_chart_time.png",
+            "is_time": True
+        },
+        {
+            "col": "Memory_MB",
+            "ylabel": "Peak Memory (MB)",
+            "title": "Performance Comparison: Memory Usage",
+            "filename": "benchmark_chart_memory.png",
+            "is_time": False
+        }
+    ]
+
+    for metric in metrics:
+        plt.figure(figsize=(12, 7)) # Khung hình rộng hơn chút cho dễ nhìn
+        
+        # 1. Chuẩn bị dữ liệu
+        df_plot = df.copy()
+        
+        if metric["is_time"]:
+            # Với biểu đồ Time: Fill giá trị Timeout bằng giới hạn để vẽ đường chạm trần
+            df_plot.loc[df_plot["Status"] == "Timeout", "Time"] = TIMEOUT_LIMIT
+            # Chỉ lấy các trạng thái có ý nghĩa để vẽ
+            valid_statuses = ["Success", "Timeout", "No Solution"]
+            df_plot = df_plot[df_plot["Status"].isin(valid_statuses)]
+        else:
+            # Với biểu đồ Memory: Bỏ qua các dòng không có dữ liệu Memory (Timeout/Skipped/Error)
+            df_plot = df_plot[df_plot["Memory_MB"].notna()]
+
+        # 2. Vẽ từng đường (mỗi thuật toán 1 đường)
+        algorithms = df_plot["Algorithm"].unique()
+        
+        for algo in algorithms:
+            # Sắp xếp theo Size để đường vẽ đi từ trái sang phải hợp lý
+            subset = df_plot[df_plot["Algorithm"] == algo].sort_values(by="Size")
+            
+            if not subset.empty:
+                plt.plot(subset["Input"], subset[metric["col"]], 
+                         marker='o', linewidth=2, markersize=6, label=algo)
+
+        # 3. Trang trí biểu đồ
+        # Nếu là biểu đồ Time, vẽ thêm đường kẻ ngang Timeout màu đỏ
+        if metric["is_time"]:
+            plt.axhline(y=TIMEOUT_LIMIT, color='r', linestyle='--', alpha=0.7, label=f'Timeout ({TIMEOUT_LIMIT}s)')
+
+        plt.xlabel("Input Files (Ordered by Map Size)")
+        plt.ylabel(metric["ylabel"])
+        plt.title(metric["title"])
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.5) # Lưới mờ
+        plt.xticks(rotation=45) # Xoay nhãn trục X cho đỡ chồng chéo
+        plt.tight_layout()
+
+        # 4. Lưu file
+        # Nếu biến OUTPUT_DIR có trong scope global thì dùng, không thì lưu thư mục hiện tại
+        save_path = os.path.join(image_dir, metric["filename"])
+        
+        plt.savefig(save_path)
+        plt.close() # Đóng plot để giải phóng RAM
+        
+        print(f"Đã lưu biểu đồ: {save_path}")
