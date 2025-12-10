@@ -185,7 +185,7 @@ class AStarSolver(BaseSolver):
     def __init__(self, input_file):
         super().__init__(input_file)
     
-    def heuristic(self, assignment, approach):
+    def heuristic(self, assignment, approach=1):
         """
         Tính toán giá trị Heuristic h(n).
         assignment: dict {var_id: bool}
@@ -228,25 +228,25 @@ class AStarSolver(BaseSolver):
                 # Clause là list các literal (VD: [-1, 2] nghĩa là NOT 1 OR 2)
                 # Clause vi phạm khi TẤT CẢ literal đều False
                 is_clause_satisfied = False
-            is_clause_undetermined = False
-            
-            for lit in clause:
-                var_id = abs(lit)
-                is_pos = (lit > 0)
+                is_clause_undetermined = False
                 
-                # Nếu biến chưa được gán -> Clause chưa xác định (chưa vi phạm)
-                if var_id not in assignment:
-                    is_clause_undetermined = True
-                    break # Chưa thể kết luận clause này False
+                for lit in clause:
+                    var_id = abs(lit)
+                    is_pos = (lit > 0)
+                    
+                    # Nếu biến chưa được gán -> Clause chưa xác định (chưa vi phạm)
+                    if var_id not in assignment:
+                        is_clause_undetermined = True
+                        break # Chưa thể kết luận clause này False
+                    
+                    val = assignment[var_id]
+                    # Nếu literal là True (VD: lit=1, val=True HOẶC lit=-1, val=False)
+                    if (is_pos and val) or (not is_pos and not val):
+                        is_clause_satisfied = True
+                        break
                 
-                val = assignment[var_id]
-                # Nếu literal là True (VD: lit=1, val=True HOẶC lit=-1, val=False)
-                if (is_pos and val) or (not is_pos and not val):
-                    is_clause_satisfied = True
-                    break
-            
-            if not is_clause_satisfied and not is_clause_undetermined:
-                violated_clauses += 1
+                if not is_clause_satisfied and not is_clause_undetermined:
+                    violated_clauses += 1
         
             h_score += violated_clauses * 100 # Vi phạm luật là rất tệ
         
