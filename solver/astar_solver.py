@@ -1,5 +1,5 @@
+import heapq
 from .base_solver import BaseSolver
-
 from utils import (
     AStarNode, 
     unit_propagation, 

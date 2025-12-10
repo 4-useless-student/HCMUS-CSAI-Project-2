@@ -1,3 +1,4 @@
+import itertools
 from .base_solver import BaseSolver
 
 

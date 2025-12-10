@@ -1,6 +1,6 @@
 import os
 import time
-from algs_helper import AStarSolver, CNFSolver, BacktrackingSolver, BruteForceSolver
+from solver import AStarSolver, BacktrackingSolver, BruteForceSolver
 
 
 
