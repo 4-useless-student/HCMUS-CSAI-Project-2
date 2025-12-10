@@ -1,6 +1,4 @@
-import heapq
 import time
-import itertools
 
 class BaseSolver:
     def __init__(self, input_file):
