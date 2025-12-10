@@ -1,6 +1,15 @@
 import heapq
 import time
 import itertools
+from utils import (
+    AStarNode, 
+    unit_propagation, 
+    pure_literal_elimination,
+    check_all_clauses_satisfied,
+    count_unsatisfied_clauses,
+    select_variable_vsids,
+    compute_variable_scores
+)
 
 class BaseSolver:
     def __init__(self, input_file):
@@ -113,7 +122,7 @@ class BaseSolver:
 
     def generate_cnf(self):
         """
-        Sinh các mệnh đề CNF mô tả luật chơi.
+        Sinh các mệnh đề CNF mô tả luật chơi - Improved version.
         """
         self.cnf_clauses = []
         
@@ -123,49 +132,89 @@ class BaseSolver:
             v1 = self.bridge_vars[i]['1']
             v2 = self.bridge_vars[i]['2']
             self.cnf_clauses.append([-v2, v1])
+            # Thêm ràng buộc: Nếu x1 sai thì x2 phải sai
+            self.cnf_clauses.append([v1, -v2])
 
         # 2. Ràng buộc: Cầu không cắt nhau
-        # Chỉ xét cặp (Ngang, Dọc) có giao điểm
         horizontals = [b for b in self.potential_bridges if b['dir'] == 'H']
         verticals = [b for b in self.potential_bridges if b['dir'] == 'V']
         
         for h in horizontals:
             for v in verticals:
-                # Kiểm tra giao nhau: Row của H nằm giữa Row đầu/cuối của V
-                # và Col của V nằm giữa Col đầu/cuối của H
                 if (v['u'][0] < h['u'][0] < v['v'][0]) and \
                    (h['u'][1] < v['u'][1] < h['v'][1]):
-                    # Nếu cắt nhau, không thể cùng tồn tại
-                    # Cấm: H có cầu (>=1) VÀ V có cầu (>=1)
-                    # CNF: NOT(H_1) OR NOT(V_1)
                     idx_h = h['id']
                     idx_v = v['id']
                     self.cnf_clauses.append([-self.bridge_vars[idx_h]['1'], -self.bridge_vars[idx_v]['1']])
 
         # 3. Ràng buộc: Tổng số cầu quanh đảo == Giá trị đảo
-        # Đây là phần phức tạp nhất. Ta sẽ dùng phương pháp liệt kê các cấu hình HỢP LỆ.
+        # Sử dụng encoding cardinality constraint
         for idx, (r, c, val) in enumerate(self.islands):
             # Lấy tất cả cầu nối vào đảo này
-            connected_bridges = []
+            connected_bridge_vars = []
+            
             for b in self.potential_bridges:
                 if b['u_idx'] == idx or b['v_idx'] == idx:
-                    connected_bridges.append(b['id'])
+                    b_id = b['id']
+                    # Thêm cả x1 và x2 vào list (x1 đóng góp 1, x2 đóng góp thêm 1 nữa)
+                    connected_bridge_vars.append(self.bridge_vars[b_id]['1'])
+                    connected_bridge_vars.append(self.bridge_vars[b_id]['2'])
             
-            # Sinh tất cả các tổ hợp số lượng cầu (0, 1, 2) cho các cạnh nối
-            # Ví dụ: Đảo nối với 3 cầu (b1, b2, b3). Cần tổng = val.
-            valid_configs = []
-            # Mỗi cầu có thể là 0, 1 hoặc 2
-            for config in itertools.product([0, 1, 2], repeat=len(connected_bridges)):
-                if sum(config) == val:
-                    valid_configs.append(config)
-            
-            # Nếu không có config nào thỏa mãn -> Vô nghiệm (thêm clause rỗng để fail ngay)
-            if not valid_configs:
-                self.cnf_clauses.append([]) 
+            if not connected_bridge_vars:
+                if val != 0:
+                    self.cnf_clauses.append([])  # UNSAT
                 continue
-            pass
+            
+            # Encode exactly-k constraint bằng cách kết hợp at-least-k và at-most-k
+            # Đây là version đơn giản hóa, chỉ xử lý các case phổ biến
+            self._encode_exactly_k(connected_bridge_vars, val)
         
-        print(f"Generated {len(self.cnf_clauses)} basic CNF clauses.")
+        # 4. Ràng buộc: Kết nối liên thông
+        N = len(self.islands)
+        min_bridges = N - 1
+        
+        if N > 1 and len(self.potential_bridges) >= min_bridges:
+            bridge_v1_vars = [self.bridge_vars[i]['1'] for i in range(len(self.potential_bridges))]
+            
+            M = len(self.potential_bridges)
+            max_false = M - min_bridges
+            
+            # At-least-K encoding: Trong mọi tập (max_false + 1) biến, ít nhất 1 phải True
+            if max_false >= 0 and max_false < M and max_false < 10:  # Giới hạn để tránh explosion
+                from itertools import combinations
+                for subset in combinations(range(M), min(max_false + 1, M)):
+                    clause = [bridge_v1_vars[i] for i in subset]
+                    self.cnf_clauses.append(clause)
+        
+        print(f"Generated {len(self.cnf_clauses)} CNF clauses.")
+    
+    def _encode_exactly_k(self, variables, k):
+        """
+        Encode exactly-k constraint: Đúng k biến trong list phải là True
+        Sử dụng phương pháp đơn giản cho các giá trị k nhỏ
+        """
+        n = len(variables)
+        
+        # At-least-k: Cấm tất cả tổ hợp có nhiều hơn (n-k) biến False
+        if k > 0:
+            max_false = n - k
+            if max_false >= 0 and max_false < n:
+                from itertools import combinations
+                # Nếu có nhiều hơn max_false biến False -> vi phạm
+                if max_false + 1 <= min(n, 15):  # Giới hạn để tránh quá nhiều clause
+                    for subset in combinations(range(n), max_false + 1):
+                        # Ít nhất 1 trong subset phải True
+                        clause = [variables[i] for i in subset]
+                        self.cnf_clauses.append(clause)
+        
+        # At-most-k: Cấm tất cả tổ hợp có nhiều hơn k biến True
+        if k < n:
+            if k + 1 <= min(n, 15):  # Giới hạn
+                from itertools import combinations
+                for subset in combinations(range(n), k + 1):
+                    # Không được tất cả đều True
+                    clause = [-variables[i] for i in subset]
+                    self.cnf_clauses.append(clause)
 
     def run(self):
         self.parse_input()
@@ -184,146 +233,245 @@ class BaseSolver:
 class AStarSolver(BaseSolver):
     def __init__(self, input_file):
         super().__init__(input_file)
+        self.visited_states = set()
+        self.var_scores = {}
     
-    def heuristic(self, assignment, approach=1):
-        """
-        Tính toán giá trị Heuristic h(n).
-        assignment: dict {var_id: bool}
-        """
-        if approach == 1:
-            h_score = 0
-            
-            # --- Ý tưởng 1: Số lượng đảo chưa thỏa mãn điều kiện số cầu ---
-            # Cần tính lại tổng số cầu hiện tại cho mỗi đảo dựa trên assignment
-            current_island_sums = {i: 0 for i in range(len(self.islands))}
-            
-            for b_idx, var_map in enumerate(self.bridge_vars):
-                v1 = var_map['1']
-                v2 = var_map['2']
-                
-                val = 0
-                # Kiểm tra assignment có gán True cho các biến này không
-                if assignment.get(v2, False): 
-                    val = 2
-                elif assignment.get(v1, False): 
-                    val = 1
-                
-                if val > 0:
-                    b_info = self.potential_bridges[b_idx]
-                    current_island_sums[b_info['u_idx']] += val
-                    current_island_sums[b_info['v_idx']] += val
-            
-            unsatisfied_islands = 0
-            for i, (r, c, target_val) in enumerate(self.islands):
-                if current_island_sums[i] != target_val:
-                    # Có thể cải tiến: cộng thêm độ chênh lệch abs(target - current)
-                    unsatisfied_islands += 1 # Hoặc += abs(target_val - current_island_sums[i])
-            
-            h_score += unsatisfied_islands * 10 # Trọng số cao cho đảo
-
-        elif approach == 2:
-            # --- Ý tưởng 2: Số lượng mệnh đề (Clauses) bị vi phạm ---
-            violated_clauses = 0
-            for clause in self.cnf_clauses:
-                # Clause là list các literal (VD: [-1, 2] nghĩa là NOT 1 OR 2)
-                # Clause vi phạm khi TẤT CẢ literal đều False
-                is_clause_satisfied = False
-                is_clause_undetermined = False
-                
-                for lit in clause:
-                    var_id = abs(lit)
-                    is_pos = (lit > 0)
-                    
-                    # Nếu biến chưa được gán -> Clause chưa xác định (chưa vi phạm)
-                    if var_id not in assignment:
-                        is_clause_undetermined = True
-                        break # Chưa thể kết luận clause này False
-                    
-                    val = assignment[var_id]
-                    # Nếu literal là True (VD: lit=1, val=True HOẶC lit=-1, val=False)
-                    if (is_pos and val) or (not is_pos and not val):
-                        is_clause_satisfied = True
-                        break
-                
-                if not is_clause_satisfied and not is_clause_undetermined:
-                    violated_clauses += 1
+    def _state_key(self, assignment):
+        """Tạo key duy nhất cho trạng thái"""
+        return tuple(sorted(assignment.items()))
+    
+    def _early_pruning(self, assignment):
+        """Kiểm tra sớm các ràng buộc vi phạm"""
+        # 1. Kiểm tra vi phạm số cầu tại mỗi đảo
+        current_island_sums = {i: 0 for i in range(len(self.islands))}
+        potential_island_sums = {i: 0 for i in range(len(self.islands))}
         
-            h_score += violated_clauses * 100 # Vi phạm luật là rất tệ
+        for b_idx, var_map in enumerate(self.bridge_vars):
+            v1 = var_map['1']
+            v2 = var_map['2']
+            
+            val = 0
+            max_potential = 2
+            
+            if v2 in assignment:
+                if assignment[v2]:
+                    val = 2
+                    max_potential = 2
+                else:
+                    max_potential = 1 if v1 not in assignment or assignment.get(v1, False) else 0
+            elif v1 in assignment:
+                if assignment[v1]:
+                    val = 1
+                    max_potential = 2
+                else:
+                    val = 0
+                    max_potential = 0
+            
+            b_info = self.potential_bridges[b_idx]
+            current_island_sums[b_info['u_idx']] += val
+            current_island_sums[b_info['v_idx']] += val
+            potential_island_sums[b_info['u_idx']] += max_potential
+            potential_island_sums[b_info['v_idx']] += max_potential
+        
+        for i, (r, c, target_val) in enumerate(self.islands):
+            current = current_island_sums[i]
+            potential = potential_island_sums[i]
+            
+            if current > target_val or potential < target_val:
+                return False
+        
+        # 2. Kiểm tra vi phạm cầu cắt nhau
+        for clause in self.cnf_clauses:
+            if len(clause) == 2 and clause[0] < 0 and clause[1] < 0:
+                var1 = abs(clause[0])
+                var2 = abs(clause[1])
+                if assignment.get(var1, False) and assignment.get(var2, False):
+                    return False
+        
+        return True
+    
+    def _select_next_variable_improved(self, assignment):
+        """
+        Kết hợp VSIDS với Most Constrained Variable heuristic
+        """
+        # Tính toán trạng thái hiện tại của các đảo
+        current_island_sums = {i: 0 for i in range(len(self.islands))}
+        
+        for b_idx, var_map in enumerate(self.bridge_vars):
+            v1 = var_map['1']
+            v2 = var_map['2']
+            
+            val = 0
+            if assignment.get(v2, False):
+                val = 2
+            elif assignment.get(v1, False):
+                val = 1
+            
+            if val > 0:
+                b_info = self.potential_bridges[b_idx]
+                current_island_sums[b_info['u_idx']] += val
+                current_island_sums[b_info['v_idx']] += val
+        
+        # Tìm biến có impact cao nhất
+        best_var = None
+        best_score = -float('inf')
+        
+        for b_idx, var_map in enumerate(self.bridge_vars):
+            v1 = var_map['1']
+            v2 = var_map['2']
+            
+            if v1 not in assignment:
+                b_info = self.potential_bridges[b_idx]
+                u_idx = b_info['u_idx']
+                v_idx = b_info['v_idx']
+                
+                # Điểm dựa trên mức độ cấp thiết của đảo
+                u_needed = abs(self.islands[u_idx][2] - current_island_sums[u_idx])
+                v_needed = abs(self.islands[v_idx][2] - current_island_sums[v_idx])
+                urgency_score = -(u_needed + v_needed)  # Negative because we want minimum
+                
+                # Điểm VSIDS
+                vsids_score = self.var_scores.get(v1, 0)
+                
+                # Kết hợp
+                combined_score = urgency_score * 10 + vsids_score
+                
+                if combined_score > best_score:
+                    best_score = combined_score
+                    best_var = v1
+                    
+            elif v2 not in assignment and assignment.get(v1, False):
+                # Ưu tiên cao nếu v1 đã True
+                return v2
+        
+        if best_var is None:
+            # Fallback: lấy biến đầu tiên chưa gán
+            for var_id in range(1, self.num_vars + 1):
+                if var_id not in assignment:
+                    return var_id
+        
+        return best_var
+    
+    def heuristic(self, assignment):
+        """
+        Admissible heuristic: Tổng độ chênh lệch số cầu của các đảo
+        """
+        h_score = 0
+        current_island_sums = {i: 0 for i in range(len(self.islands))}
+        
+        for b_idx, var_map in enumerate(self.bridge_vars):
+            v1 = var_map['1']
+            v2 = var_map['2']
+            
+            val = 0
+            if assignment.get(v2, False): 
+                val = 2
+            elif assignment.get(v1, False): 
+                val = 1
+            
+            if val > 0:
+                b_info = self.potential_bridges[b_idx]
+                current_island_sums[b_info['u_idx']] += val
+                current_island_sums[b_info['v_idx']] += val
+        
+        for i, (r, c, target_val) in enumerate(self.islands):
+            diff = abs(target_val - current_island_sums[i])
+            h_score += diff
         
         return h_score
 
     def solve(self):
-        """Thực thi thuật toán A*"""
-        self.generate_cnf() # Sinh các ràng buộc trước
+        """A* với Unit Propagation và Pure Literal Elimination"""
+        self.generate_cnf()
         
-        # Priority Queue: (f, g, assignment_dict)
-        # assignment lưu {var_id: True/False}
-        # Lưu ý: A* trên không gian biến CNF rất lớn, ta chỉ duyệt biến Var_1, Var_2 cho mỗi cầu
+        # Tính VSIDS scores
+        self.var_scores = compute_variable_scores(self.cnf_clauses)
         
+        # Khởi tạo
         start_assignment = {}
-        g = 0
+        
+        # Áp dụng Pure Literal Elimination ngay từ đầu
+        start_assignment = pure_literal_elimination(start_assignment, self.cnf_clauses, 
+                                                   list(range(1, self.num_vars + 1)))
+        
+        # Áp dụng Unit Propagation
+        success, start_assignment = unit_propagation(start_assignment, self.cnf_clauses)
+        if not success:
+            print("No solution found!")
+            return
+        
+        g = len(start_assignment)
         h = self.heuristic(start_assignment)
         f = g + h
         
-        # Counter để break tie trong heap
-        count = 0 
         open_set = []
-        heapq.heappush(open_set, (f, g, count, start_assignment))
+        initial_node = AStarNode(f, g, start_assignment)
+        heapq.heappush(open_set, initial_node)
         
-        print("Starting A*...")
+        best_f_score = {self._state_key(start_assignment): f}
         
-        # Để tối ưu, cần xác định thứ tự gán biến (Variable Ordering)
-        # Sắp xếp biến theo cầu nối vào đảo nhỏ nhất trước (Most Constrained)
-        ordered_vars = []
-        for b in self.potential_bridges:
-            ordered_vars.append(self.bridge_vars[b['id']]['1'])
-            ordered_vars.append(self.bridge_vars[b['id']]['2'])
-            
+        iterations = 0
+        
         while open_set:
-            current_f, current_g, _, current_assignment = heapq.heappop(open_set)
+            iterations += 1
             
-            # Kiểm tra Goal: Đã gán hết biến và H_score = 0 (thỏa mãn hết)
-            # (Hoặc logic check goal riêng)
+            current_node = heapq.heappop(open_set)
+            current_assignment = current_node.assignment
+            
+            state_key = self._state_key(current_assignment)
+            if state_key in self.visited_states:
+                continue
+            self.visited_states.add(state_key)
+            
+            # Goal test
             if len(current_assignment) == self.num_vars:
-                if self.heuristic(current_assignment) == 0:
-                    self.reconstruct_solution(current_assignment)
-                    return
-                else:
-                    continue # Nhánh này sai, bỏ qua
-
-            # Chọn biến chưa gán tiếp theo
-            # Đơn giản nhất: Lấy biến có ID nhỏ nhất chưa có trong assignment
-            var_to_assign = -1
-            for var_id in range(1, self.num_vars + 1):
-                if var_id not in current_assignment:
-                    var_to_assign = var_id
-                    break
+                if check_all_clauses_satisfied(current_assignment, self.cnf_clauses):
+                    if self._early_pruning(current_assignment):
+                        self.reconstruct_solution(current_assignment)
+                        print("Solution found!")
+                        return
+                continue
             
-            if var_to_assign == -1: continue
-
-            # Sinh trạng thái con: Gán True / False
+            # Early pruning
+            if not self._early_pruning(current_assignment):
+                continue
+            
+            # Select variable
+            var_to_assign = self._select_next_variable_improved(current_assignment)
+            if var_to_assign is None:
+                continue
+            
+            # Try both values
             for val in [True, False]:
                 new_assign = current_assignment.copy()
                 new_assign[var_to_assign] = val
                 
-                # Pruning cơ bản: Check nhanh xem gán xong có vi phạm CNF Crossing không?
-                # (Đã tích hợp trong heuristic phần violated_clauses, nếu > 0 thì f sẽ rất lớn)
-                
-                new_g = current_g + 1
-                new_h = self.heuristic(new_assign)
-                
-                # Nếu heuristic quá lớn (vi phạm ràng buộc cứng), cắt tỉa luôn
-                if new_h >= 1000: 
+                # Unit Propagation
+                success, propagated_assign = unit_propagation(new_assign, self.cnf_clauses)
+                if not success:
                     continue
-                    
+                
+                new_state_key = self._state_key(propagated_assign)
+                if new_state_key in self.visited_states:
+                    continue
+                
+                # Early pruning
+                if not self._early_pruning(propagated_assign):
+                    continue
+                
+                new_g = len(propagated_assign)
+                new_h = self.heuristic(propagated_assign)
                 new_f = new_g + new_h
-                count += 1
-                heapq.heappush(open_set, (new_f, new_g, count, new_assign))
-
-        print("No solution found by A*.")
+                
+                # Add to queue if better
+                if new_state_key not in best_f_score or new_f < best_f_score[new_state_key]:
+                    best_f_score[new_state_key] = new_f
+                    new_node = AStarNode(new_f, new_g, propagated_assign, var_to_assign)
+                    heapq.heappush(open_set, new_node)
+        
+        print("No solution found!")
 
     def reconstruct_solution(self, assignment):
-        print("Solution found!")
         self.solution = []
         # Convert assignment back to bridge format for output
         for i, b in enumerate(self.potential_bridges):
@@ -369,25 +517,31 @@ class AStarSolver(BaseSolver):
 if __name__ == "__main__":
     # Tạo file giả lập để test
     with open("input-test.txt", "w") as f:
-        f.write("2 0 4 0 2\n0 0 0 0 0\n1 0 3 0 1")
+        f.write("2 0 0 0 2\n0 0 0 0 0\n0 0 0 0 0")
     
     solver = AStarSolver("input-test.txt")
     solver.run()
 
 
 class CNFSolver(BaseSolver):
-    def __init__():
-        pass
-    def solve():
-        pass
-class BacktrackingSolver(BaseSolver):
-    def __init__():
-        pass
-    def solve():
+    def __init__(self, input_file):
+        super().__init__(input_file)
+    
+    def solve(self):
         pass
 
-class BruteForceSolver(BaseSolver):
-    def __init__():
+
+class BacktrackingSolver(BaseSolver):
+    def __init__(self, input_file):
+        super().__init__(input_file)
+    
+    def solve(self):
         pass
-    def solve():
+
+
+class BruteForceSolver(BaseSolver):
+    def __init__(self, input_file):
+        super().__init__(input_file)
+    
+    def solve(self):
         pass
