@@ -3,19 +3,10 @@ from .base_solver import BaseSolver
 
 
 class BruteForceSolver(BaseSolver):
-    """
-    Thuật toán Brute Force để giải CNF.
-    Các bước thực hiện:
-    1. Thu thập tất cả biến xuất hiện trong CNF
-    2. Sinh tất cả phép gán (True/False) với itertools.product
-    3. Áp dụng Unit Propagation và Pure Literal Elimination để tối ưu
-    4. Kiểm tra tính thỏa mãn của CNF với mỗi phép gán
-    """
     def __init__(self, input_file):
         super().__init__(input_file)
     
     def solve(self):
-        """Thực thi thuật toán Brute Force"""
         # Sinh CNF
         self.generate_cnf()
         
@@ -49,7 +40,6 @@ class BruteForceSolver(BaseSolver):
                 return
     
     def _apply_propagation(self, clauses, assignment):
-        """Áp dụng Unit Propagation để phát hiện mâu thuẫn sớm"""
         changed = True
         while changed:
             changed = False
@@ -98,10 +88,6 @@ class BruteForceSolver(BaseSolver):
         return assignment, True
     
     def _check_cnf_satisfaction(self, assignment):
-        """
-        Kiểm tra tính thỏa mãn của CNF với phép gán hiện tại.
-        Mỗi mệnh đề phải có ít nhất 1 literal được thỏa mãn.
-        """
         for clause in self.cnf_clauses:
             clause_satisfied = False
             
@@ -120,7 +106,6 @@ class BruteForceSolver(BaseSolver):
         return True
     
     def _reconstruct_solution_from_cnf(self, assignment):
-        """Chuyển CNF assignment thành bridge solution"""
         self.solution = []
         
         for i, bridge in enumerate(self.potential_bridges):
@@ -146,7 +131,6 @@ class BruteForceSolver(BaseSolver):
                 })
     
     def format_solution(self):
-        """Vẽ ma trận kết quả"""
         if not self.solution:
             return []
         
