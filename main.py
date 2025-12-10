@@ -34,7 +34,7 @@ def main():
         solver_classes = [
             # AStarSolver,
             # CNFSolver, 
-            BacktrackingSolver,
+            # BacktrackingSolver,
             BruteForceSolver
         ]
         
