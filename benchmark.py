@@ -65,7 +65,8 @@ def main():
         return
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
-
+    if not os.path.exists(IMAGE_DIR):
+        os.makedirs(IMAGE_DIR) 
     files = [f for f in os.listdir(INPUT_FOLDER) if f.endswith('.txt')]
     files.sort()
     
@@ -73,7 +74,7 @@ def main():
     
     # Danh sách thuật toán
     solver_classes = [
-        #PySATSolver,
+        PySATSolver,
         AStarSolver,
         BacktrackingSolver,
         BruteForceSolver
