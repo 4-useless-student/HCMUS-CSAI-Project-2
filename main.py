@@ -1,7 +1,6 @@
 import os
 import time
-from solver import AStarSolver, BacktrackingSolver, BruteForceSolver
-
+from solver import AStarSolver, BacktrackingSolver, BruteForceSolver, PySATSolver
 
 
 def main():
@@ -32,9 +31,9 @@ def main():
         
         # --- Thêm thuật toán muốn chạy vào đây ---
         solver_classes = [
-            # AStarSolver,
-            # CNFSolver, 
-            # BacktrackingSolver,
+            AStarSolver,
+            PySATSolver, 
+            BacktrackingSolver,
             BruteForceSolver
         ]
         
