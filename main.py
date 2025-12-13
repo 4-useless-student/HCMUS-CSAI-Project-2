@@ -92,14 +92,14 @@ def main(solvers, input_idx):
 if __name__ == "__main__":
     # Danh sách các thuật toán muốn chạy
     solvers_to_run = [
-        AStarSolver,
         PySATSolver, 
+        AStarSolver,
         BacktrackingSolver,
         BruteForceSolver
     ]
     
     # Danh sách các ID của file input muốn chạy (Ví dụ: input-01.txt, input-05.txt)
-    input_ids_to_run = [6] 
+    input_ids_to_run = [10] 
     
     # Gọi hàm main với tham số
     main(solvers=solvers_to_run, input_idx=input_ids_to_run)
