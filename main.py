@@ -19,9 +19,6 @@ def main(solvers, input_idx):
 
     print(f"Bắt đầu chạy với các input ID: {input_idx}")
     print(f"Các thuật toán: {[s.__name__ for s in solvers]}\n")
-    print("-" * 75)
-    print(f"{'Input File':<15} | {'Algorithm':<20} | {'Time (s)':<10} | {'Status'}")
-    print("-" * 75)
 
     # 2. Duyệt qua từng ID trong danh sách input_idx
     for idx in input_idx:
@@ -31,7 +28,7 @@ def main(solvers, input_idx):
         
         # Kiểm tra file input có tồn tại không
         if not os.path.exists(input_path):
-            print(f"{filename:<15} | {'---':<20} | {'---':<10} | File not found")
+            print(f"{filename} | {'---'} | {'---'} | File not found")
             continue
         
         # 3. Chạy từng thuật toán cho file input hiện tại
@@ -39,7 +36,7 @@ def main(solvers, input_idx):
             algo_name = SolverClass.__name__
             
             try:
-                print(f"Run {algo_name} solver for {filename}\n")
+                print(f"Run {algo_name} solver for {filename}")
                 # Khởi tạo solver
                 solver = SolverClass(input_path)
         
@@ -61,7 +58,7 @@ def main(solvers, input_idx):
                 solver_thread.join(timeout=TIME_OUT)
 
                 if solver_thread.is_alive():
-                    print(f"{filename:<15} | {algo_name:<20} | > {TIME_OUT:<8} | Time Limit Exceeded")
+                    print(f"{filename} | {algo_name} | > {TIME_OUT} | Time Limit Exceeded")
                     continue
 
                 if thread_result["error"]:
@@ -72,7 +69,7 @@ def main(solvers, input_idx):
 
                 # Kiểm tra solution
                 if solver.solution is None:
-                    print(f"{filename:<15} | {algo_name:<20} | {exec_time:<10.4f} | No Solution")
+                    print(f"{filename} | {algo_name} | {exec_time:<10.4f} | No Solution")
                     continue
                 
                 # Lưu output
@@ -80,13 +77,15 @@ def main(solvers, input_idx):
                 output_path = os.path.join(OUTPUT_DIR, output_filename)
                 solver.save_output(output_path)
                 
-                print(f"{filename:<15} | {algo_name:<20} | {exec_time:<10.4f} | Done")
+                print(f"{filename} | {algo_name} | {exec_time:<10.4f} | Done")
 
             except Exception as e:
                 # In lỗi nếu có vấn đề trong quá trình chạy
-                print(f"{filename:<15} | {algo_name:<20} | ERROR      | {str(e)}")
+                print(f"{filename} | {algo_name} | ERROR | {str(e)}")
+            
+            print()
+        print()
 
-    print("-" * 75)
     print("Hoàn tất xử lý.")
 
 if __name__ == "__main__":
@@ -99,7 +98,7 @@ if __name__ == "__main__":
     ]
     
     # Danh sách các ID của file input muốn chạy (Ví dụ: input-01.txt, input-05.txt)
-    input_ids_to_run = [10] 
+    input_ids_to_run = [2] 
     
     # Gọi hàm main với tham số
     main(solvers=solvers_to_run, input_idx=input_ids_to_run)

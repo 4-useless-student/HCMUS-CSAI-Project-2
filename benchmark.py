@@ -13,7 +13,7 @@ IMAGE_DIR = "images"
 OUTPUT_DIR = "Outputs"
 
 # THIẾT LẬP TIMEOUT
-TIMEOUT_LIMIT = 60  # Giây. Nếu chạy quá 60s sẽ bị kill.
+TIMEOUT = 60  #Nếu chạy quá 60s sẽ bị kill.
 SKIP_BRUTEFORCE_LARGE = True 
 LARGE_MAP_THRESHOLD = 12 # Size >= 12 sẽ skip BruteForce
 
@@ -85,7 +85,7 @@ def main():
 
     for filename in files:
         input_path = os.path.join(INPUT_FOLDER, filename)
-        print(f"Solve {filename}\n")
+        print(f"Solve {filename}")
         # Lấy size nhanh để check điều kiện skip
         rows, cols, map_size = get_map_size(input_path)
         size_str = f"{rows}x{cols}"
@@ -93,9 +93,9 @@ def main():
         for SolverClass in solver_classes:
             algo_name = SolverClass.__name__
             
-            # Skip BruteForce map lớn
+            # Skip BruteForce nếu size map lớn
             if SKIP_BRUTEFORCE_LARGE and algo_name == "BruteForceSolver" and map_size >= LARGE_MAP_THRESHOLD:
-                print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'-':<10} | SKIPPED (Too Large)")
+                print(f"{filename} | {size_str} | {algo_name} | {'-'} | SKIPPED (Too Large)")
                 results_data.append({
                     "Input": filename, "Size": map_size, "Algorithm": algo_name,
                     "Time": None, "Memory_MB": None, "Status": "Skipped"
@@ -111,26 +111,26 @@ def main():
             p = multiprocessing.Process(target=run_wrapper, args=(SolverClass, input_path, output_path, queue))
             
             p.start() # Bắt đầu chạy process con
-            p.join(timeout=TIMEOUT_LIMIT) # Chờ tối đa TIMEOUT_LIMIT giây
+            p.join(timeout=TIMEOUT) # Chờ tối đa TIMEOUT giây
 
             if p.is_alive():
                 # Nếu vẫn còn sống sau timeout -> Kill
                 p.terminate()
                 p.join() # Clean up
                 
-                print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'> ' + str(TIMEOUT_LIMIT) + 's':<10} | TIMEOUT")
+                print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'> ' + str(TIMEOUT) + 's':<10} | TIMEOUT")
                 results_data.append({
                     "Input": filename, "Size": map_size, "Algorithm": algo_name,
-                    "Time": TIMEOUT_LIMIT, "Memory_MB": None, "Status": "Timeout"
+                    "Time": TIMEOUT, "Memory_MB": None, "Status": "Timeout"
                 })
             else:
                 # Nếu chạy xong trước timeout -> Lấy kết quả từ Queue
                 if not queue.empty():
                     result = queue.get()
                     if result["status"] == "Error":
-                        print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'ERROR':<10} | {result['error_msg']}")
+                        print(f"{filename} | {size_str} | {algo_name} | {'ERROR':<10} | {result['error_msg']}")
                     else:
-                        print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {result['time']:<10.4f} | {result['status']}")
+                        print(f"{filename} | {size_str} | {algo_name} | {result['time']:<10.4f} | {result['status']}")
                         
                     results_data.append({
                         "Input": filename, "Size": map_size, "Algorithm": algo_name,
@@ -140,15 +140,16 @@ def main():
                     })
                 else:
                     # Trường hợp crash mà không gửi được dữ liệu
-                    print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'CRASH':<10} | Process died unexpectedly")
+                    print(f"{filename} | {size_str} | {algo_name} | {'CRASH':<10} | Process died unexpectedly")
 
-    # --- Visualize ---
+        print() # xuống dòng
+
+    # Visualize
     if results_data:
         df = pd.DataFrame(results_data)
         df.to_csv(OUTPUT_REPORT, index=False)
-        print("\n" + "-" * 80)
         print(f"Đã lưu benchmark report vào: {OUTPUT_REPORT}")
-        plot_benchmark(df, IMAGE_DIR, TIMEOUT_LIMIT)
+        plot_benchmark(df, IMAGE_DIR, TIMEOUT)
 
 
 if __name__ == "__main__":
