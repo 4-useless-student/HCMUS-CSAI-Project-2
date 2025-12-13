@@ -1,71 +1,105 @@
 import os
 import time
+import threading
 from solver import AStarSolver, BacktrackingSolver, BruteForceSolver, PySATSolver
 
+INPUT_DIR = "Inputs"  
+OUTPUT_DIR = "Outputs"
+TIME_OUT = 10
 
-def main():
-    # 1. Cấu hình đường dẫn
-    input_folder = "Inputs"   
-    output_folder = "Outputs"
+def main(solvers, input_idx):
+    # 1. Tạo thư mục Output nếu chưa có
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
 
-    # Tạo thư mục Output nếu chưa có
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-
-    # 2. Lấy danh sách file input và sắp xếp
-    try:
-        files = [f for f in os.listdir(input_folder) if f.endswith('.txt')]
-        files.sort() # Sắp xếp để chạy từ input-01 -> input-10
-    except FileNotFoundError:
-        print(f"Lỗi: Không tìm thấy thư mục '{input_folder}'. Hãy kiểm tra lại đường dẫn.")
+    # Kiểm tra thư mục Input
+    if not os.path.exists(INPUT_DIR):
+        print(f"Lỗi: Không tìm thấy thư mục '{INPUT_DIR}'. Hãy kiểm tra lại đường dẫn.")
         return
 
-    print(f"Tìm thấy {len(files)} file input. Bắt đầu chạy...\n")
-    print("-" * 60)
-    print(f"{'Input File':<15} | {'Algorithm':<15} | {'Time (s)':<10} | {'Status'}")
-    print("-" * 60)
+    print(f"Bắt đầu chạy với các input ID: {input_idx}")
+    print(f"Các thuật toán: {[s.__name__ for s in solvers]}\n")
+    print("-" * 75)
+    print(f"{'Input File':<15} | {'Algorithm':<20} | {'Time (s)':<10} | {'Status'}")
+    print("-" * 75)
 
-    # 3. Duyệt qua từng file input
-    for filename in files:
-        input_path = os.path.join(input_folder, filename)
+    # 2. Duyệt qua từng ID trong danh sách input_idx
+    for idx in input_idx:
+        # Định dạng tên file: 5 -> input-05.txt, 10 -> input-10.txt
+        filename = f"input-{idx:02d}.txt"
+        input_path = os.path.join(INPUT_DIR, filename)
         
-        # --- Thêm thuật toán muốn chạy vào đây ---
-        solver_classes = [
-            AStarSolver,
-            PySATSolver, 
-            BacktrackingSolver,
-            BruteForceSolver
-        ]
+        # Kiểm tra file input có tồn tại không
+        if not os.path.exists(input_path):
+            print(f"{filename:<15} | {'---':<20} | {'---':<10} | File not found")
+            continue
         
-        for SolverClass in solver_classes:
+        # 3. Chạy từng thuật toán cho file input hiện tại
+        for SolverClass in solvers:
             algo_name = SolverClass.__name__
             
             try:
+                print(f"Run {algo_name} solver for {filename}\n")
                 # Khởi tạo solver
                 solver = SolverClass(input_path)
+        
+                thread_result = {"exec_time": None, "error": None}
                 
-                # Chạy thuật toán và đo giờ
-                exec_time = solver.run()
+                # Hàm wrapper để chạy trong thread
+                def run_solver_wrapper():
+                    try:
+                        thread_result["exec_time"] = solver.run()
+                    except Exception as e:
+                        thread_result["error"] = e
+
+                # Tạo và chạy thread
+                solver_thread = threading.Thread(target=run_solver_wrapper)
+                solver_thread.daemon = True
+                solver_thread.start()
                 
-                # Kiểm tra xem có solution không
+                # Chờ thread chạy trong khoảng TIME_OUT
+                solver_thread.join(timeout=TIME_OUT)
+
+                if solver_thread.is_alive():
+                    print(f"{filename:<15} | {algo_name:<20} | > {TIME_OUT:<8} | Time Limit Exceeded")
+                    continue
+
+                if thread_result["error"]:
+                    # Trường hợp code solver bị lỗi
+                    raise thread_result["error"]
+                
+                exec_time = thread_result["exec_time"]
+
+                # Kiểm tra solution
                 if solver.solution is None:
-                    print(f"{filename:<15} | {algo_name:<15} | {exec_time:<10.4f} | No Solution")
+                    print(f"{filename:<15} | {algo_name:<20} | {exec_time:<10.4f} | No Solution")
                     continue
                 
-                # Tạo tên file output: input-01.txt -> output-01_AStarSolver.txt
+                # Lưu output
                 output_filename = filename.replace('input', 'output').replace('.txt', f'_{algo_name}.txt')
-                output_path = os.path.join(output_folder, output_filename)
-                
-                # Lưu kết quả
+                output_path = os.path.join(OUTPUT_DIR, output_filename)
                 solver.save_output(output_path)
                 
-                print(f"{filename:<15} | {algo_name:<15} | {exec_time:<10.4f} | Done")
+                print(f"{filename:<15} | {algo_name:<20} | {exec_time:<10.4f} | Done")
 
             except Exception as e:
-                print(f"{filename:<15} | {algo_name:<15} | ERROR      | {str(e)}")
+                # In lỗi nếu có vấn đề trong quá trình chạy
+                print(f"{filename:<15} | {algo_name:<20} | ERROR      | {str(e)}")
 
-    print("-" * 60)
-    print("Hoàn tất xử lý tất cả file.")
+    print("-" * 75)
+    print("Hoàn tất xử lý.")
 
 if __name__ == "__main__":
-    main()
+    # Danh sách các thuật toán muốn chạy
+    solvers_to_run = [
+        AStarSolver,
+        PySATSolver, 
+        BacktrackingSolver,
+        BruteForceSolver
+    ]
+    
+    # Danh sách các ID của file input muốn chạy (Ví dụ: input-01.txt, input-05.txt)
+    input_ids_to_run = [6] 
+    
+    # Gọi hàm main với tham số
+    main(solvers=solvers_to_run, input_idx=input_ids_to_run)

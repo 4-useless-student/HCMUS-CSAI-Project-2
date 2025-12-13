@@ -3,6 +3,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
+def get_map_size(input_path):
+    with open(input_path, 'r') as f:
+        lines = f.readlines()
+    
+    # Đếm số dòng (rows)
+    rows = len([line for line in lines if line.strip()])
+    
+    # Đếm số cột (cols) từ dòng đầu tiên
+    if rows > 0:
+        first_line = lines[0].strip()
+        # Tách theo dấu phẩy và đếm
+        cols = len([x.strip() for x in first_line.split(',') if x.strip()])
+    else:
+        cols = 0
+    
+    return rows, cols, max(rows, cols)
+
 class AStarNode:
     """Node class for A* search with better comparison"""
     def __init__(self, f_value, g_value, assignment, var_id=None):

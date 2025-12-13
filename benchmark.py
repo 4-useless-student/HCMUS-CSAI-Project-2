@@ -4,7 +4,7 @@ import pandas as pd
 import tracemalloc
 import multiprocessing
 from solver import AStarSolver, BacktrackingSolver, BruteForceSolver, PySATSolver
-from utils import plot_benchmark
+from utils import plot_benchmark, get_map_size
 
 # --- CẤU HÌNH ---
 INPUT_FOLDER = "Inputs"
@@ -15,7 +15,7 @@ OUTPUT_DIR = "Outputs"
 # THIẾT LẬP TIMEOUT
 TIMEOUT_LIMIT = 60  # Giây. Nếu chạy quá 60s sẽ bị kill.
 SKIP_BRUTEFORCE_LARGE = True 
-LARGE_MAP_THRESHOLD = 12 # Size >= 12 sẽ auto skip BruteForce (đỡ tốn công tạo process)
+LARGE_MAP_THRESHOLD = 12 # Size >= 12 sẽ skip BruteForce
 
 def run_wrapper(SolverClass, input_path, output_path, queue):
     """
@@ -85,17 +85,15 @@ def main():
 
     for filename in files:
         input_path = os.path.join(INPUT_FOLDER, filename)
-        
+        print(f"Solve {filename}\n")
         # Lấy size nhanh để check điều kiện skip
-        temp_solver = AStarSolver(input_path) # Dùng class nào cũng được để parse
-        temp_solver.parse_input()
-        map_size = max(temp_solver.rows, temp_solver.cols)
-        size_str = f"{temp_solver.rows}x{temp_solver.cols}"
+        rows, cols, map_size = get_map_size(input_path)
+        size_str = f"{rows}x{cols}"
 
         for SolverClass in solver_classes:
             algo_name = SolverClass.__name__
             
-            # Logic Skip BruteForce map lớn (để đỡ tốn resource tạo process)
+            # Skip BruteForce map lớn
             if SKIP_BRUTEFORCE_LARGE and algo_name == "BruteForceSolver" and map_size >= LARGE_MAP_THRESHOLD:
                 print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'-':<10} | SKIPPED (Too Large)")
                 results_data.append({
@@ -144,7 +142,7 @@ def main():
                     # Trường hợp crash mà không gửi được dữ liệu
                     print(f"{filename:<15} | {size_str:<8} | {algo_name:<20} | {'CRASH':<10} | Process died unexpectedly")
 
-    # --- LƯU VÀ VẼ ---
+    # --- Visualize ---
     if results_data:
         df = pd.DataFrame(results_data)
         df.to_csv(OUTPUT_REPORT, index=False)
@@ -154,6 +152,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # Bắt buộc phải có dòng này khi dùng multiprocessing trên Windows
     multiprocessing.freeze_support() 
     main()
