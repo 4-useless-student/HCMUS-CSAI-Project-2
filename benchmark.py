@@ -13,7 +13,7 @@ IMAGE_DIR = "images"
 OUTPUT_DIR = "Outputs"
 
 # THIẾT LẬP TIMEOUT
-TIMEOUT = 60  #Nếu chạy quá 60s sẽ bị kill.
+TIMEOUT_LIMIT = 500  # Giây. Nếu chạy quá 500s sẽ bị kill.
 SKIP_BRUTEFORCE_LARGE = True 
 LARGE_MAP_THRESHOLD = 12 # Size >= 12 sẽ skip BruteForce
 

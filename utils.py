@@ -132,59 +132,6 @@ def check_all_clauses_satisfied(assignment, cnf_clauses):
     return True
 
 
-def count_unsatisfied_clauses(assignment, cnf_clauses):
-    """Đếm số clause chưa được thỏa mãn (dùng cho heuristic)"""
-    unsatisfied = 0
-    
-    for clause in cnf_clauses:
-        satisfied = False
-        all_assigned = True
-        
-        for lit in clause:
-            var_id = abs(lit)
-            if var_id not in assignment:
-                all_assigned = False
-            elif (lit > 0 and assignment[var_id] == True) or \
-                 (lit < 0 and assignment[var_id] == False):
-                satisfied = True
-                break
-        
-        if all_assigned and not satisfied:
-            unsatisfied += 1
-    
-    return unsatisfied
-
-
-def select_variable_vsids(assignment, cnf_clauses, var_scores):
-    """
-    Variable State Independent Decaying Sum (VSIDS) heuristic.
-    Chọn biến xuất hiện nhiều trong các clause gần đây.
-    """
-    best_var = None
-    best_score = -1
-    
-    for clause in cnf_clauses:
-        clause_satisfied = False
-        for lit in clause:
-            var_id = abs(lit)
-            if var_id in assignment:
-                val = assignment[var_id]
-                if (lit > 0 and val == True) or (lit < 0 and val == False):
-                    clause_satisfied = True
-                    break
-        
-        if not clause_satisfied:
-            for lit in clause:
-                var_id = abs(lit)
-                if var_id not in assignment:
-                    score = var_scores.get(var_id, 0)
-                    if score > best_score:
-                        best_score = score
-                        best_var = var_id
-    
-    return best_var
-
-
 def compute_variable_scores(cnf_clauses):
     """Tính điểm cho mỗi biến dựa trên tần suất xuất hiện"""
     scores = {}
