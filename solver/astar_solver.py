@@ -5,8 +5,6 @@ from utils import (
     unit_propagation, 
     pure_literal_elimination,
     check_all_clauses_satisfied,
-    count_unsatisfied_clauses,
-    select_variable_vsids,
     compute_variable_scores
 )
 

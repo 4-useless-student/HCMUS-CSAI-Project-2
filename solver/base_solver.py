@@ -141,17 +141,6 @@ class BaseSolver:
             if cnf_obj.nv > self.num_vars: self.num_vars = cnf_obj.nv
             self.cnf_clauses.extend(cnf_obj.clauses)
         
-        # 4. Liên thông yếu (>= N-1 cạnh)
-        N = len(self.islands)
-        if N > 1:
-            all_v1_vars = [self.bridge_vars[i]['1'] for i in range(len(self.potential_bridges))]
-            if len(all_v1_vars) >= N - 1:
-                cnf_obj = CardEnc.atleast(lits=all_v1_vars, bound=N - 1, encoding=1, top_id=self.num_vars)
-                if cnf_obj.nv > self.num_vars: self.num_vars = cnf_obj.nv
-                self.cnf_clauses.extend(cnf_obj.clauses)
-            else:
-                 self.cnf_clauses.append([1, -1])
-        
         print(f"Generated {len(self.cnf_clauses)} CNF clauses. Max Var: {self.num_vars}")
 
     def _reconstruct_solution_from_cnf(self, assignment):

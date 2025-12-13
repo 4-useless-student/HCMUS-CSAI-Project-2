@@ -5,7 +5,7 @@ from solver import AStarSolver, BacktrackingSolver, BruteForceSolver, PySATSolve
 
 INPUT_DIR = "Inputs"  
 OUTPUT_DIR = "Outputs"
-TIME_OUT = 10
+TIME_OUT = 120
 
 def main(solvers, input_idx):
     # 1. Tạo thư mục Output nếu chưa có
@@ -94,12 +94,12 @@ if __name__ == "__main__":
     solvers_to_run = [
         PySATSolver, 
         AStarSolver,
-        BacktrackingSolver,
-        BruteForceSolver
+        BacktrackingSolver
+        #BruteForceSolver
     ]
     
     # Danh sách các ID của file input muốn chạy (Ví dụ: input-01.txt, input-05.txt)
-    input_ids_to_run = [10] 
+    input_ids_to_run = [1,2,3,4,5,6,7,8,9,10] 
     
     # Gọi hàm main với tham số
     main(solvers=solvers_to_run, input_idx=input_ids_to_run)
