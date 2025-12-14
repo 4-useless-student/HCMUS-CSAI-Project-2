@@ -14,7 +14,7 @@ OUTPUT_DIR = "Outputs"
 
 # THIẾT LẬP TIMEOUT
 TIMEOUT = 120  # Giây. Nếu chạy quá 120s sẽ bị kill.
-SKIP_BRUTEFORCE_LARGE = True 
+SKIP_BRUTEFORCE_LARGE = False
 LARGE_MAP_THRESHOLD = 12 # Size >= 12 sẽ skip BruteForce
 
 def run_wrapper(SolverClass, input_path, output_path, queue):
